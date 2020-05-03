@@ -5,36 +5,18 @@ import (
 	"errors"
 )
 
-// Function that make a byte xor between two byte slices
-func xor(dst, src []byte) {
-	for i := range dst {
-		dst[i] = dst[i] ^ src[i]
-	}
-}
-
-// Check the AES IGE inputs
-func inputIGE(data, key, iv []byte) error {
-	if len(data) % aes.BlockSize != 0 || len(data) == 0 {
-		return errors.New("AES256 IGE: data isn't divisible by block size (16 bytes)")
-	}
-
-	if len(key) == 0 {
-		return errors.New("key is empty")
-	}
-
-	if len(iv) == 0 {
-		return errors.New("IV is empty")
-	}
-
-	return nil
-}
-
 // Encrypt or Decrypt an input slice using AES IGE
 func encryptDecryptIGE(in, key, iv []byte, encrypt bool) ([]byte, error) {
 	// Check the inputs
-	err := inputIGE(in, key, iv)
+	err := inputAESCheck(in, key, iv)
 	if err != nil {
 		return nil, err
+	}
+	if len(in) % aes.BlockSize != 0 {
+		return nil, errors.New("input data length isn't a multiple of the block size")
+	}
+	if len(iv) != 32 {
+		return nil, errors.New("IV length must be 32 bytes")
 	}
 
 	// Create a new AES cipher with the key
@@ -69,7 +51,7 @@ func encryptDecryptIGE(in, key, iv []byte, encrypt bool) ([]byte, error) {
 		chunk := in[i:i+aes.BlockSize]
 
 		// iv1 = previous output (or iv) ^ current input
-		xor(iv1, chunk)
+		xorSlice(iv1, chunk)
 
 		if encrypt {
 			// AES256 encrypt (aes package)
@@ -81,7 +63,7 @@ func encryptDecryptIGE(in, key, iv []byte, encrypt bool) ([]byte, error) {
 
 		// AddRoundKey passage
 		// expandedKey = sessionKey ^ previous input (or iv)
-		xor(expandedKey, iv2)
+		xorSlice(expandedKey, iv2)
 
 		// Reassign iv1 and iv2 for next iteration
 		// iv1: output just obtained
@@ -95,12 +77,12 @@ func encryptDecryptIGE(in, key, iv []byte, encrypt bool) ([]byte, error) {
 	return result, nil
 }
 
-// Encrypt data with AES256 IGE
+// Encrypt data with AES IGE
 func EncryptIGE(in, key, iv []byte) ([]byte, error) {
 	return encryptDecryptIGE(in, key, iv, true)
 }
 
-// Decrypt data with AES256 IGE
+// Decrypt data with AES IGE
 func DecryptIGE(in, key, iv []byte) ([]byte, error) {
 	return encryptDecryptIGE(in, key, iv, false)
 }
