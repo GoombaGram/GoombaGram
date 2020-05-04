@@ -29,16 +29,12 @@ func AES256CTRNew(aesKey, aesIV []byte) *AES256CTR {
 }
 
 // Function to decrypt or encrypt using AES CTR
-func (aesCtr *AES256CTR) EncryptDecrypt(in []byte) []byte {
+func (aesCtr *AES256CTR) EncryptDecrypt(in []byte) {
 	// Check the inputs
 	if len(in) == 0 {
-		return nil
+		return
 	}
 
-	// XOR CTR stream encrypt/decrypt
-	result := make([]byte, len(in))
-	aesCtr.stream.XORKeyStream(result, in)
-
-	// Return result (encrypted/decrypted)
-	return result
+	// CTR stream encrypt/decrypt
+	aesCtr.stream.XORKeyStream(in, in)
 }
