@@ -1,1 +1,3 @@
-# TelegramGo
+# GoombaGram
+
+**Go**ombaGram
