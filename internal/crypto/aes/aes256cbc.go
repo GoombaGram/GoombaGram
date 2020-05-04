@@ -6,17 +6,29 @@ import(
 	"errors"
 )
 
+type AES256CBC struct {
+	aesKey, aesIV []byte
+}
+
+func AES256CBCNew(aesKey, aesIV []byte) *AES256CBC {
+	if len(aesIV) != 16 {
+		return nil
+	}
+
+	if !(len(aesKey) == 16 || len(aesKey) == 24 || len(aesKey) == 32) {
+		return nil
+	}
+
+	return &AES256CBC{
+		aesKey: aesKey,
+		aesIV:  aesIV,
+	}
+}
+
 func encryptDecryptCBC(in, key, iv []byte, encrypt bool) ([]byte, error) {
 	// Check the inputs
-	err := inputAESCheck(in, key, iv)
-	if err != nil {
-		return nil, err
-	}
-	if len(in) % aes.BlockSize != 0 {
+	if len(in) % aes.BlockSize != 0 && len(in) != 0{
 		return nil, errors.New("input data length isn't a multiple of the block size")
-	}
-	if len(iv) != 16 {
-		return nil, errors.New("IV length must be 16 bytes")
 	}
 
 	// Create a new AES cipher with the key
@@ -43,11 +55,11 @@ func encryptDecryptCBC(in, key, iv []byte, encrypt bool) ([]byte, error) {
 }
 
 // Encrypt data with AES CBC
-func EncryptCBC(in, key, iv []byte) ([]byte, error) {
-	return encryptDecryptCBC(in, key, iv, true)
+func (aes *AES256CBC) Encrypt(in []byte) ([]byte, error) {
+	return encryptDecryptCBC(in, aes.aesKey, aes.aesIV, true)
 }
 
 // Decrypt data with AES CBC
-func DecryptCBC(in, key, iv []byte) ([]byte, error){
-	return encryptDecryptCBC(in, key, iv, false)
+func (aes *AES256CBC) Decrypt(in []byte) ([]byte, error){
+	return encryptDecryptCBC(in, aes.aesKey, aes.aesIV, false)
 }

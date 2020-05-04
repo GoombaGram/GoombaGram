@@ -2,27 +2,45 @@ package aes
 
 import (
 	"crypto/aes"
-	"errors"
 )
 
+type AES256IGE struct {
+	aesKey, aesIV []byte
+}
+
+func AES256IGENew(aesKey, aesIV []byte) *AES256IGE {
+	if (len(aesIV)) < aes.BlockSize {
+		return nil
+	}
+
+	if !(len(aesKey) == 16 || len(aesKey) == 24 || len(aesKey) == 32) {
+		return nil
+	}
+
+	return &AES256IGE {
+		aesKey: aesKey,
+		aesIV:  aesIV,
+	}
+}
+
+// Function that make a byte xor between two byte slices
+func xorSlice(dst, src []byte) {
+	for i := range dst {
+		dst[i] = dst[i] ^ src[i]
+	}
+}
+
 // Encrypt or Decrypt an input slice using AES IGE
-func encryptDecryptIGE(in, key, iv []byte, encrypt bool) ([]byte, error) {
+func encryptDecryptIGE(in, key, iv []byte, encrypt bool) []byte{
 	// Check the inputs
-	err := inputAESCheck(in, key, iv)
-	if err != nil {
-		return nil, err
-	}
-	if len(in) % aes.BlockSize != 0 {
-		return nil, errors.New("input data length isn't a multiple of the block size")
-	}
-	if len(iv) != 32 {
-		return nil, errors.New("IV length must be 32 bytes")
+	if len(in) % aes.BlockSize != 0 && len(in) != 0{
+		return nil
 	}
 
 	// Create a new AES cipher with the key
 	block, err := aes.NewCipher(key)
 	if err != nil {
-		return nil, err
+		return nil
 	}
 
 	// Create the result variable
@@ -74,15 +92,15 @@ func encryptDecryptIGE(in, key, iv []byte, encrypt bool) ([]byte, error) {
 		copy(result[i:], expandedKey)
 	}
 
-	return result, nil
+	return result
 }
 
 // Encrypt data with AES IGE
-func EncryptIGE(in, key, iv []byte) ([]byte, error) {
-	return encryptDecryptIGE(in, key, iv, true)
+func (aes AES256IGE) Encrypt(in []byte) []byte {
+	return encryptDecryptIGE(in, aes.aesKey, aes.aesIV, true)
 }
 
 // Decrypt data with AES IGE
-func DecryptIGE(in, key, iv []byte) ([]byte, error) {
-	return encryptDecryptIGE(in, key, iv, false)
+func (aes AES256IGE) Decrypt(in []byte) []byte {
+	return encryptDecryptIGE(in, aes.aesKey, aes.aesIV, false)
 }
