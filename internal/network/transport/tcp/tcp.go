@@ -63,18 +63,23 @@ func (tcp *tcp) sendAll(data []byte) error {
 	return nil
 }
 
-func (tcp *tcp) receiveAll(data []byte) error {
+func (tcp *tcp) receiveAll(length int) ([]byte, error) {
 	if tcp.Conn == nil {
-		return errors.New("tcp hasn't been connected")
+		return nil, errors.New("tcp hasn't been connected")
 	}
 
-	_, err := tcp.Conn.Read(data)
+	data := make([]byte, length)
+	num, err := tcp.Conn.Read(data)
 
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	return nil
+	if length > num {
+		return nil, errors.New("some bytes are missing")
+	}
+
+	return data, nil
 }
 
 func (tcp *tcp) close() error {

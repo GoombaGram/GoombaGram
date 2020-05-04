@@ -5,10 +5,10 @@ import (
 )
 
 type netApplication interface {
-	connect(address string, proxyConnect *proxyType.SOCKS5Proxy) error
-	send(data []byte) error
-	receive(data []byte) error
-	close() error
+	Connect(address string, proxyConnect *proxyType.SOCKS5Proxy) error
+	Send(data []byte) error
+	Receive(data []byte) error
+	Close() error
 }
 
 var modes = []string {"abridged", "abridgedO", "full", "intermediate", "intermediateO"}
