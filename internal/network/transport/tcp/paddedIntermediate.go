@@ -20,48 +20,49 @@ import (
 	"encoding/binary"
 	"github.com/TelegramGo/TelegramGo/GoombaGram/Proxy"
 	"github.com/TelegramGo/TelegramGo/internal/crypto/aes"
+	"math/rand"
 )
 
-// Intermediate
+// Padded intermediate
 //
-// In case 4-byte data alignment is needed, an intermediate version of the original protocol may be used.
+// Padded version of the intermediate protocol, to use with obfuscation enabled to bypass ISP blocks.
 //
-// Overhead: small
-// Minimum envelope length: 4 bytes
-// Maximum envelope length: 4 bytes
-type Intermediate struct{
+// Overhead: small-medium
+// Minimum envelope length: random
+// Maximum envelope length: random
+type PaddedIntermediate struct{
 	*tcp								// TCP connection
 	encrypt, decrypt *aes.AES256CTR		// AES-256 CTR encrypt/decrypt (only with obfuscation true)
 }
 
-func (inter *Intermediate) Connect(address string, obfuscation bool, proxyConnect *Proxy.SOCKS5Proxy) error {
+func (pad *PaddedIntermediate) Connect(address string, obfuscation bool, proxyConnect *Proxy.SOCKS5Proxy) error {
 	var err error
-	inter.tcp, err = tcpNew(proxyConnect)
+	pad.tcp, err = tcpNew(proxyConnect)
 	if err != nil {
 		return err
 	}
 
-	err = inter.tcp.connect(address)
+	err = pad.tcp.connect(address)
 	if err != nil {
 		return err
 	}
 
 	if obfuscation {
-		nonce, reversedNonce := obfuscationCTRGenerator(0xEE)
+		nonce, reversedNonce := obfuscationCTRGenerator(0xDD)
 
-		inter.encrypt = aes.AES256CTRNew(nonce[8:40], nonce[40:56])
-		inter.decrypt = aes.AES256CTRNew(reversedNonce[8:40], reversedNonce[40:56])
+		pad.encrypt = aes.AES256CTRNew(nonce[8:40], nonce[40:56])
+		pad.decrypt = aes.AES256CTRNew(reversedNonce[8:40], reversedNonce[40:56])
 
 		// Add aes encrypted to nonce
 		aesNonce := make([]byte, 64); copy(aesNonce, nonce)
-		inter.encrypt.EncryptDecrypt(aesNonce)
+		pad.encrypt.EncryptDecrypt(aesNonce)
 
 		// Send encrypted nonce to server (when connect)
-		err = inter.tcp.sendAll(append(nonce[:56], aesNonce[56:64]...))
+		err = pad.tcp.sendAll(append(nonce[:56], aesNonce[56:64]...))
 	} else {
 		// Telegram docs:
-		// Before sending anything into the underlying socket (see transports), the client must first send 0xeeeeeeee as the first int (four bytes, the server will not send 0xeeeeeeee as the first int in the first reply).	err = inter.tcp.sendAll([]byte{0xEF})
-		err = inter.tcp.sendAll([]byte{0xEE, 0xEE, 0xEE, 0xEE})
+		// Before sending anything into the underlying socket (see transports), the client must first send 0xdddddddd as the first int (four bytes, the server will not send 0xdddddddd as the first int in the first reply).
+		err = pad.tcp.sendAll([]byte{0xDD, 0xDD, 0xDD, 0xDD})
 	}
 
 	if err != nil {
@@ -73,23 +74,27 @@ func (inter *Intermediate) Connect(address string, obfuscation bool, proxyConnec
 
 // Send data to Telegram server using Intermediate TCP
 //
-// +----+----...----+
-// +len.+  payload  +
-// +----+----...----+
+// +----+----...----+----...----+
+// |tlen|  payload  |  padding  |
+// +----+----...----+----...----+
 //
-// Length: payload length encoded as 4 length bytes (little endian)
+// Total length: payload+padding length encoded as 4 length bytes (little endian)
 // Payload: the MTProto payload
-func (inter *Intermediate) Send(data []byte) error {
+// Padding: A random padding string of length 0-15
+func (pad *PaddedIntermediate) Send(data []byte) error {
+	// Generate a random number between 0 and 15
+	paddingLength := rand.Intn(16)
+
 	// Parse length to 4 bytes slice
 	length := make([]byte, 4)
 	binary.LittleEndian.PutUint32(length, uint32(len(data)))
 	data = append(length, data...)
 
-	if inter.encrypt != nil {
-		inter.encrypt.EncryptDecrypt(data)
+	if pad.encrypt != nil {
+		pad.encrypt.EncryptDecrypt(data)
 	}
 
-	err := inter.tcp.sendAll(data)
+	err := pad.tcp.sendAll(data)
 	if err != nil {
 		return err
 	}
@@ -102,29 +107,29 @@ func (inter *Intermediate) Send(data []byte) error {
 // +----+----...----+
 // +len.+  payload  +
 // +----+----...----+
-func (inter *Intermediate) Receive(data []byte) error {
-	length, err := inter.tcp.receiveAll(4)
+func (pad *PaddedIntermediate) Receive(data []byte) error {
+	length, err := pad.tcp.receiveAll(4)
 	if err != nil {
 		return err
 	}
 
 	// Decrypt length
-	if inter.decrypt != nil {
-		inter.decrypt.EncryptDecrypt(length)
+	if pad.decrypt != nil {
+		pad.decrypt.EncryptDecrypt(length)
 	}
 
 	// Get length of data as int
 	lenInt := int(binary.LittleEndian.Uint32(length))
 
 	// Get n bytes
-	data, err = inter.tcp.receiveAll(lenInt)
+	data, err = pad.tcp.receiveAll(lenInt)
 	if err != nil {
 		return err
 	}
 
 	// Decrypt received data
-	if inter.decrypt != nil {
-		inter.decrypt.EncryptDecrypt(data)
+	if pad.decrypt != nil {
+		pad.decrypt.EncryptDecrypt(data)
 	}
 
 	return nil

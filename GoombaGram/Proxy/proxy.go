@@ -14,18 +14,9 @@
  * along with GoombaGram.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package network
+package Proxy
 
-import (
-	"github.com/TelegramGo/TelegramGo/GoombaGram/Proxy"
-)
-
-type netApplication interface {
-	Connect(address string, obfuscation bool, proxyConnect *Proxy.SOCKS5Proxy) error
-	Send(data []byte) error
-	Receive(data []byte) error
-	Close() error
+type SOCKS5Proxy struct {
+	ProxyIP, Username, Password string
 }
-
-var modes = []string {"abridged", "full", "intermediate", "intermediatePadded"}
 
