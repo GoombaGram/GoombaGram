@@ -18,7 +18,7 @@ package tcp
 
 import (
 	"encoding/binary"
-	"github.com/TelegramGo/TelegramGo/internal/crypto/aes"
+	"github.com/GoombaGram/GoombaGram/internal/crypto/aes"
 )
 
 // Intermediate

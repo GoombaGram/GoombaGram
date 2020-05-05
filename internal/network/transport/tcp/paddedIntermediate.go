@@ -18,7 +18,7 @@ package tcp
 
 import (
 	"encoding/binary"
-	"github.com/TelegramGo/TelegramGo/internal/crypto/aes"
+	"github.com/GoombaGram/GoombaGram/internal/crypto/aes"
 	"math/rand"
 )
 
@@ -70,7 +70,7 @@ func (pad *PaddedIntermediate) Connect(address string, obfuscation bool) error {
 // Send data to Telegram server using Intermediate TCP
 //
 // +----+----...----+----...----+
-// |tlen|  payload  |  padding  |
+// |tLen|  payload  |  padding  |
 // +----+----...----+----...----+
 //
 // Total length: payload+padding length encoded as 4 length bytes (little endian)
@@ -86,9 +86,9 @@ func (pad *PaddedIntermediate) Send(data []byte) error {
 	// Parse length to 4 bytes slice
 	length := make([]byte, 4)
 	binary.LittleEndian.PutUint32(length, uint32(len(data) + len(padding)))
+
 	// Add data and padding
-	data = append(length, data...)
-	data = append(data, padding...)
+	data = append(append(length, data...), padding...)
 
 	if pad.encrypt != nil {
 		pad.encrypt.EncryptDecrypt(data)
@@ -105,7 +105,7 @@ func (pad *PaddedIntermediate) Send(data []byte) error {
 // Receive n data to Telegram server using Intermediate TCP
 //
 // +----+----...----+----...----+
-// |tlen|  payload  |  padding  |
+// |tLen|  payload  |  padding  |
 // +----+----...----+----...----+
 func (pad *PaddedIntermediate) Receive(data []byte) error {
 	length, err := pad.tcpConnection.receiveAll(4)

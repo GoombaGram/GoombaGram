@@ -18,7 +18,7 @@ package tcp
 
 import (
 	"encoding/binary"
-	"github.com/TelegramGo/TelegramGo/internal/crypto/aes"
+	"github.com/GoombaGram/GoombaGram/internal/crypto/aes"
 )
 
 // Abridged
@@ -81,16 +81,15 @@ func (abr *Abridged) Send(data []byte) error {
 	length := uint32(len(data)/4)
 	if length >= 127 {
 		// Parse length to 3 bytes slice
-		lenB := make([]byte, 4)
-		binary.LittleEndian.PutUint32(lenB, length)
-		lenB = lenB[:len(lenB)-1]
+		byteLength := make([]byte, 4)
+		binary.LittleEndian.PutUint32(byteLength, length)
+		byteLength = byteLength[:len(byteLength)-1]
 
 		// If the packet length divided by four is bigger than or equal to 127 (>= 0x7f), the following envelope must be used, instead:
 		// Header: A single byte of value 0x7f
 		// Length: payload length, divided by four, and encoded as 3 length bytes (little endian)
 		// Payload: the MTProto payload
-		lenB = append([]byte{0xEF}, lenB...)
-		data = append(lenB, data...)
+		data = append(append([]byte{0x7F}, byteLength...), data...)
 	} else {
 		// Length: payload length, divided by four, and encoded as a single byte, only if the resulting packet length is a value between 0x01..0x7e.
 		// Payload: the MTProto payload

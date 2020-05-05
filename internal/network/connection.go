@@ -23,7 +23,7 @@ type netInterface interface {
 	Close() error
 }
 
-var modes = []string {"abridged", "full", "intermediate", "intermediatePadded"}
+var modes = []string {"abridged", "intermediate", "intermediatePadded"}
 
 // TCP (obfuscated mode available)
 // 0: Abridged
