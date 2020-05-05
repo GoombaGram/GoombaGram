@@ -18,7 +18,6 @@ package tcp
 
 import (
 	"encoding/binary"
-	"github.com/TelegramGo/TelegramGo/GoombaGram/Proxy"
 	"github.com/TelegramGo/TelegramGo/internal/crypto/aes"
 	"math/rand"
 )
@@ -31,18 +30,14 @@ import (
 // Minimum envelope length: random
 // Maximum envelope length: random
 type PaddedIntermediate struct{
-	*tcp								// TCP connection
-	encrypt, decrypt *aes.AES256CTR		// AES-256 CTR encrypt/decrypt (only with obfuscation true)
+	*tcpConnection                  // TCP connection
+	encrypt, decrypt *aes.AES256CTR // AES-256 CTR encrypt/decrypt (only with obfuscation true)
 }
 
-func (pad *PaddedIntermediate) Connect(address string, obfuscation bool, proxyConnect *Proxy.SOCKS5Proxy) error {
-	var err error
-	pad.tcp, err = tcpNew(proxyConnect)
-	if err != nil {
-		return err
-	}
+func (pad *PaddedIntermediate) Connect(address string, obfuscation bool) error {
+	pad.tcpConnection = tcpNew()
 
-	err = pad.tcp.connect(address)
+	err := pad.tcpConnection.connect(address)
 	if err != nil {
 		return err
 	}
@@ -58,11 +53,11 @@ func (pad *PaddedIntermediate) Connect(address string, obfuscation bool, proxyCo
 		pad.encrypt.EncryptDecrypt(aesNonce)
 
 		// Send encrypted nonce to server (when connect)
-		err = pad.tcp.sendAll(append(nonce[:56], aesNonce[56:64]...))
+		err = pad.tcpConnection.sendAll(append(nonce[:56], aesNonce[56:64]...))
 	} else {
 		// Telegram docs:
 		// Before sending anything into the underlying socket (see transports), the client must first send 0xdddddddd as the first int (four bytes, the server will not send 0xdddddddd as the first int in the first reply).
-		err = pad.tcp.sendAll([]byte{0xDD, 0xDD, 0xDD, 0xDD})
+		err = pad.tcpConnection.sendAll([]byte{0xDD, 0xDD, 0xDD, 0xDD})
 	}
 
 	if err != nil {
@@ -83,18 +78,23 @@ func (pad *PaddedIntermediate) Connect(address string, obfuscation bool, proxyCo
 // Padding: A random padding string of length 0-15
 func (pad *PaddedIntermediate) Send(data []byte) error {
 	// Generate a random number between 0 and 15
-	paddingLength := rand.Intn(16)
+	padding := make([]byte, rand.Intn(16))
+	if len(padding) != 0 {
+		rand.Read(padding)
+	}
 
 	// Parse length to 4 bytes slice
 	length := make([]byte, 4)
-	binary.LittleEndian.PutUint32(length, uint32(len(data)))
+	binary.LittleEndian.PutUint32(length, uint32(len(data) + len(padding)))
+	// Add data and padding
 	data = append(length, data...)
+	data = append(data, padding...)
 
 	if pad.encrypt != nil {
 		pad.encrypt.EncryptDecrypt(data)
 	}
 
-	err := pad.tcp.sendAll(data)
+	err := pad.tcpConnection.sendAll(data)
 	if err != nil {
 		return err
 	}
@@ -104,11 +104,11 @@ func (pad *PaddedIntermediate) Send(data []byte) error {
 
 // Receive n data to Telegram server using Intermediate TCP
 //
-// +----+----...----+
-// +len.+  payload  +
-// +----+----...----+
+// +----+----...----+----...----+
+// |tlen|  payload  |  padding  |
+// +----+----...----+----...----+
 func (pad *PaddedIntermediate) Receive(data []byte) error {
-	length, err := pad.tcp.receiveAll(4)
+	length, err := pad.tcpConnection.receiveAll(4)
 	if err != nil {
 		return err
 	}
@@ -122,7 +122,7 @@ func (pad *PaddedIntermediate) Receive(data []byte) error {
 	lenInt := int(binary.LittleEndian.Uint32(length))
 
 	// Get n bytes
-	data, err = pad.tcp.receiveAll(lenInt)
+	data, err = pad.tcpConnection.receiveAll(lenInt)
 	if err != nil {
 		return err
 	}

@@ -20,46 +20,26 @@ package tcp
 import (
 	"encoding/binary"
 	"errors"
-	"github.com/TelegramGo/TelegramGo/GoombaGram/Proxy"
-	"golang.org/x/net/proxy"
 	"math/rand"
 	"net"
 )
 
-type tcp struct{
+type tcpConnection struct{
 	net.Conn
-	proxy.Dialer
 }
 
-func tcpNew(proxyConnect *Proxy.SOCKS5Proxy) (*tcp, error) {
-	tcpNew := new(tcp)
-
-	if proxyConnect != nil {
-		var authentication *proxy.Auth = nil
-		if proxyConnect.Username != "" && proxyConnect.Password != "" {
-			authentication.User = proxyConnect.Username
-			authentication.Password = proxyConnect.Password
-		}
-
-		socksProxy, err := proxy.SOCKS5("tcp", proxyConnect.ProxyIP, authentication, proxy.Direct)
-		if err != nil {
-			return nil, err
-		}
-
-		tcpNew.Dialer = socksProxy
-	}
-
-	return tcpNew, nil
+func tcpNew() *tcpConnection {
+	tcpNew := new(tcpConnection)
+	return tcpNew
 }
 
-func (tcp *tcp) connect(address string) error {
-	var err error
-	if tcp.Dialer != nil {
-		tcp.Conn, err = tcp.Dialer.Dial("tcp", address)
-	} else {
-		tcp.Conn, err = net.Dial("tcp", address)
+func (tcpConn *tcpConnection) connect(address string) error {
+	remoteAddress, err := net.ResolveTCPAddr("tcp", address)
+	if err != nil {
+		return err
 	}
 
+	tcpConn.Conn, err = net.DialTCP("tcp", nil, remoteAddress)
 	if err != nil {
 		return err
 	}
@@ -67,12 +47,12 @@ func (tcp *tcp) connect(address string) error {
 	return nil
 }
 
-func (tcp *tcp) sendAll(data []byte) error {
-	if tcp.Conn == nil {
+func (tcpConn *tcpConnection) sendAll(data []byte) error {
+	if tcpConn.Conn == nil {
 		return errors.New("tcp hasn't been connected")
 	}
 
-	_, err := tcp.Conn.Write(data)
+	_, err := tcpConn.Conn.Write(data)
 
 	if err != nil {
 		return err
@@ -81,13 +61,13 @@ func (tcp *tcp) sendAll(data []byte) error {
 	return nil
 }
 
-func (tcp *tcp) receiveAll(length int) ([]byte, error) {
-	if tcp.Conn == nil {
+func (tcpConn *tcpConnection) receiveAll(length int) ([]byte, error) {
+	if tcpConn.Conn == nil {
 		return nil, errors.New("tcp hasn't been connected")
 	}
 
 	data := make([]byte, length)
-	num, err := tcp.Conn.Read(data)
+	num, err := tcpConn.Conn.Read(data)
 
 	if err != nil {
 		return nil, err
@@ -100,12 +80,12 @@ func (tcp *tcp) receiveAll(length int) ([]byte, error) {
 	return data, nil
 }
 
-func (tcp *tcp) close() error {
-	if tcp.Conn == nil {
+func (tcpConn *tcpConnection) close() error {
+	if tcpConn.Conn == nil {
 		return errors.New("tcp hasn't been connected")
 	}
 
-	return tcp.Conn.Close()
+	return tcpConn.Conn.Close()
 }
 
 func obfuscationCTRGenerator (protocol byte) ([]byte, []byte) {

@@ -18,7 +18,6 @@ package tcp
 
 import (
 	"encoding/binary"
-	"github.com/TelegramGo/TelegramGo/GoombaGram/Proxy"
 	"github.com/TelegramGo/TelegramGo/internal/crypto/aes"
 )
 
@@ -30,19 +29,15 @@ import (
 // Minimum envelope length: 1 byte
 // Maximum envelope length: 4 bytes
 type Abridged struct{
-	*tcp								// TCP connection (even with a proxy)
-	encrypt, decrypt *aes.AES256CTR		// AES-256 CTR encrypt/decrypt (only with obfuscation true)
+	*tcpConnection                  // TCP connection (even with a proxy)
+	encrypt, decrypt *aes.AES256CTR // AES-256 CTR encrypt/decrypt (only with obfuscation true)
 }
 
 // Abridged TCP transport (or obfuscated)
-func (abr *Abridged) Connect(address string, obfuscation bool, proxyConnect *Proxy.SOCKS5Proxy) error {
-	var err error
-	abr.tcp, err = tcpNew(proxyConnect)
-	if err != nil {
-		return err
-	}
+func (abr *Abridged) Connect(address string, obfuscation bool) error {
+	abr.tcpConnection = tcpNew()
 
-	err = abr.tcp.connect(address)
+	err := abr.tcpConnection.connect(address)
 	if err != nil {
 		return err
 	}
@@ -58,11 +53,11 @@ func (abr *Abridged) Connect(address string, obfuscation bool, proxyConnect *Pro
 		abr.encrypt.EncryptDecrypt(aesNonce)
 
 		// Send encrypted nonce to server (when connect)
-		err = abr.tcp.sendAll(append(nonce[:56], aesNonce[56:64]...))
+		err = abr.tcpConnection.sendAll(append(nonce[:56], aesNonce[56:64]...))
 	} else {
 		// Telegram docs:
 		// Before sending anything into the underlying socket (see transports), the client must first send 0xef as the first byte (the server will not send 0xef as the first byte in the first reply).
-		err = abr.tcp.sendAll([]byte{0xEF})
+		err = abr.tcpConnection.sendAll([]byte{0xEF})
 	}
 
 	// Check for errors
@@ -108,7 +103,7 @@ func (abr *Abridged) Send(data []byte) error {
 	}
 
 	// Send all bytes
-	err := abr.tcp.sendAll(data)
+	err := abr.tcpConnection.sendAll(data)
 	if err != nil {
 		return err
 	}
@@ -126,7 +121,7 @@ func (abr *Abridged) Send(data []byte) error {
 // |h|len|  payload  +
 // +-+---+----...----+
 func (abr *Abridged) Receive(data []byte) error {
-	length, err := abr.tcp.receiveAll(1)
+	length, err := abr.tcpConnection.receiveAll(1)
 	if err != nil {
 		return err
 	}
@@ -136,7 +131,7 @@ func (abr *Abridged) Receive(data []byte) error {
 	}
 
 	if length[0] == 0x7F {
-		length, err = abr.tcp.receiveAll(3)
+		length, err = abr.tcpConnection.receiveAll(3)
 		if err != nil {
 			return err
 		}
@@ -156,7 +151,7 @@ func (abr *Abridged) Receive(data []byte) error {
 	lenInt := int(binary.LittleEndian.Uint32(length) * 4)
 
 	// Get n bytes
-	data, err = abr.tcp.receiveAll(lenInt)
+	data, err = abr.tcpConnection.receiveAll(lenInt)
 	if err != nil {
 		return err
 	}

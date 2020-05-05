@@ -18,7 +18,6 @@ package tcp
 
 import (
 	"encoding/binary"
-	"github.com/TelegramGo/TelegramGo/GoombaGram/Proxy"
 	"github.com/TelegramGo/TelegramGo/internal/crypto/aes"
 )
 
@@ -30,18 +29,14 @@ import (
 // Minimum envelope length: 4 bytes
 // Maximum envelope length: 4 bytes
 type Intermediate struct{
-	*tcp								// TCP connection
-	encrypt, decrypt *aes.AES256CTR		// AES-256 CTR encrypt/decrypt (only with obfuscation true)
+	*tcpConnection                  // TCP connection
+	encrypt, decrypt *aes.AES256CTR // AES-256 CTR encrypt/decrypt (only with obfuscation true)
 }
 
-func (inter *Intermediate) Connect(address string, obfuscation bool, proxyConnect *Proxy.SOCKS5Proxy) error {
-	var err error
-	inter.tcp, err = tcpNew(proxyConnect)
-	if err != nil {
-		return err
-	}
+func (inter *Intermediate) Connect(address string, obfuscation bool) error {
+	inter.tcpConnection = tcpNew()
 
-	err = inter.tcp.connect(address)
+	err := inter.tcpConnection.connect(address)
 	if err != nil {
 		return err
 	}
@@ -57,11 +52,11 @@ func (inter *Intermediate) Connect(address string, obfuscation bool, proxyConnec
 		inter.encrypt.EncryptDecrypt(aesNonce)
 
 		// Send encrypted nonce to server (when connect)
-		err = inter.tcp.sendAll(append(nonce[:56], aesNonce[56:64]...))
+		err = inter.tcpConnection.sendAll(append(nonce[:56], aesNonce[56:64]...))
 	} else {
 		// Telegram docs:
-		// Before sending anything into the underlying socket (see transports), the client must first send 0xeeeeeeee as the first int (four bytes, the server will not send 0xeeeeeeee as the first int in the first reply).	err = inter.tcp.sendAll([]byte{0xEF})
-		err = inter.tcp.sendAll([]byte{0xEE, 0xEE, 0xEE, 0xEE})
+		// Before sending anything into the underlying socket (see transports), the client must first send 0xeeeeeeee as the first int (four bytes, the server will not send 0xeeeeeeee as the first int in the first reply).	err = inter.tcpConnection.sendAll([]byte{0xEF})
+		err = inter.tcpConnection.sendAll([]byte{0xEE, 0xEE, 0xEE, 0xEE})
 	}
 
 	if err != nil {
@@ -89,7 +84,7 @@ func (inter *Intermediate) Send(data []byte) error {
 		inter.encrypt.EncryptDecrypt(data)
 	}
 
-	err := inter.tcp.sendAll(data)
+	err := inter.tcpConnection.sendAll(data)
 	if err != nil {
 		return err
 	}
@@ -103,7 +98,7 @@ func (inter *Intermediate) Send(data []byte) error {
 // +len.+  payload  +
 // +----+----...----+
 func (inter *Intermediate) Receive(data []byte) error {
-	length, err := inter.tcp.receiveAll(4)
+	length, err := inter.tcpConnection.receiveAll(4)
 	if err != nil {
 		return err
 	}
@@ -117,7 +112,7 @@ func (inter *Intermediate) Receive(data []byte) error {
 	lenInt := int(binary.LittleEndian.Uint32(length))
 
 	// Get n bytes
-	data, err = inter.tcp.receiveAll(lenInt)
+	data, err = inter.tcpConnection.receiveAll(lenInt)
 	if err != nil {
 		return err
 	}

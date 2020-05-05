@@ -16,12 +16,8 @@
 
 package network
 
-import (
-	"github.com/TelegramGo/TelegramGo/GoombaGram/Proxy"
-)
-
-type netApplication interface {
-	Connect(address string, obfuscation bool, proxyConnect *Proxy.SOCKS5Proxy) error
+type netInterface interface {
+	Connect(address string, obfuscation bool) error
 	Send(data []byte) error
 	Receive(data []byte) error
 	Close() error
@@ -29,3 +25,9 @@ type netApplication interface {
 
 var modes = []string {"abridged", "full", "intermediate", "intermediatePadded"}
 
+// TCP (obfuscated mode available)
+// 0: Abridged
+// 1: Intermediate
+// 2: PaddedIntermediate
+//
+// Full transport is useless because its features are already implemented in TCP protocol
