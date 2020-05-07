@@ -16,6 +16,12 @@
 
 package network
 
+// TCP (obfuscated mode available)
+// 0: Abridged
+// 1: Intermediate
+// 2: PaddedIntermediate
+//
+// Full transport is useless because its features are already implemented in TCP protocol
 type netInterface interface {
 	Connect(address string, obfuscation bool) error
 	Send(data []byte) error
@@ -24,10 +30,3 @@ type netInterface interface {
 }
 
 var modes = []string {"abridged", "intermediate", "intermediatePadded"}
-
-// TCP (obfuscated mode available)
-// 0: Abridged
-// 1: Intermediate
-// 2: PaddedIntermediate
-//
-// Full transport is useless because its features are already implemented in TCP protocol

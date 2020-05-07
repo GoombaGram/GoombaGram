@@ -33,7 +33,7 @@ func AES256IGENew(aesKey, aesIV []byte) *AES256IGE {
 		return nil
 	}
 
-	return &AES256IGE {
+	return &AES256IGE{
 		aesKey: aesKey,
 		aesIV:  aesIV,
 	}

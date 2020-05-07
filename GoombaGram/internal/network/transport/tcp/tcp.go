@@ -25,7 +25,7 @@ import (
 )
 
 type tcpConnection struct{
-	net.Conn
+	*net.TCPConn
 }
 
 func tcpNew() *tcpConnection {
@@ -39,7 +39,7 @@ func (tcpConn *tcpConnection) connect(address string) error {
 		return err
 	}
 
-	tcpConn.Conn, err = net.DialTCP("tcp", nil, remoteAddress)
+	tcpConn.TCPConn, err = net.DialTCP("tcp", nil, remoteAddress)
 	if err != nil {
 		return err
 	}
@@ -48,26 +48,26 @@ func (tcpConn *tcpConnection) connect(address string) error {
 }
 
 func (tcpConn *tcpConnection) sendAll(data []byte) error {
-	if tcpConn.Conn == nil {
+	if tcpConn.TCPConn == nil {
 		return errors.New("tcp hasn't been connected")
 	}
 
-	_, err := tcpConn.Conn.Write(data)
+	_, err := tcpConn.TCPConn.Write(data)
 
 	if err != nil {
 		return err
 	}
-
+	
 	return nil
 }
 
 func (tcpConn *tcpConnection) receiveAll(length int) ([]byte, error) {
-	if tcpConn.Conn == nil {
+	if tcpConn.TCPConn == nil {
 		return nil, errors.New("tcp hasn't been connected")
 	}
 
 	data := make([]byte, length)
-	num, err := tcpConn.Conn.Read(data)
+	num, err := tcpConn.TCPConn.Read(data)
 
 	if err != nil {
 		return nil, err
@@ -81,11 +81,11 @@ func (tcpConn *tcpConnection) receiveAll(length int) ([]byte, error) {
 }
 
 func (tcpConn *tcpConnection) close() error {
-	if tcpConn.Conn == nil {
+	if tcpConn.TCPConn == nil {
 		return errors.New("tcp hasn't been connected")
 	}
 
-	return tcpConn.Conn.Close()
+	return tcpConn.TCPConn.Close()
 }
 
 func obfuscationCTRGenerator (protocol byte) ([]byte, []byte) {
